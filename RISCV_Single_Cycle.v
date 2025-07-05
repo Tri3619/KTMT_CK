@@ -43,8 +43,8 @@ module RISCV_Single_Cycle (
         .pc_target(pc_target)
     );
 
-    // Instruction Memory
-    InstMem imem (
+    // Instruction Memory (giữ tên IMEM)
+    IMEM imem (
         .addr(pc_curr[31:2]),
         .inst(inst)
     );
@@ -108,8 +108,8 @@ module RISCV_Single_Cycle (
         .take(branch_take)
     );
 
-    // Data Memory
-    DataMem dmem (
+    // Data Memory (giữ tên DMEM)
+    DMEM dmem (
         .clk(clk),
         .wr_en(mem_wr),
         .rd_en(mem_rd),

@@ -1,4 +1,4 @@
-module DataMem (
+module DMEM (
     input clk,
     input wr_en,
     input rd_en,

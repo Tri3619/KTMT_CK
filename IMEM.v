@@ -1,4 +1,4 @@
-module InstMem (
+module IMEM (
     input [29:0] addr,
     output [31:0] inst
 );
