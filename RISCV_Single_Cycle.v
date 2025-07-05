@@ -1,11 +1,14 @@
 module RISCV_Single_Cycle (
     input clk, rst_n,
-    output [31:0] inst_out,
-    output [31:0] pc_out,
-    output [31:0] regs [0:31]
+    output [31:0] Instruction_out_top,
+    output [31:0] PC_out_top,
+    output [31:0] registers [0:31]
 );
     // Internal signals
-    wire [31:0] pc_next, pc_curr, pc_plus4, pc_target;
+    reg [31:0] pc;
+    wire [31:0] pc_next;
+    wire [31:0] pc_plus4 = pc + 4;
+    wire [31:0] pc_target;
     wire [31:0] inst;
     wire [4:0] rs1 = inst[19:15];
     wire [4:0] rs2 = inst[24:20];
@@ -29,28 +32,25 @@ module RISCV_Single_Cycle (
     wire        is_jalr;
     wire        halt;
 
-    // Program Counter with integrated adders
-    PC pc_unit (
-        .clk(clk),
-        .rst_n(rst_n),
-        .next_pc(pc_next),
-        .imm_ext(imm),
-        .branch(branch),
-        .jump(is_jal || is_jalr),
-        .branch_take(branch_take),
-        .pc(pc_curr),
-        .pc_plus4(pc_plus4),
-        .pc_target(pc_target)
-    );
+    // PC update
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) 
+            pc <= 32'b0;
+        else 
+            pc <= pc_next;
+    end
+    
+    // Calculate PC target
+    assign pc_target = pc + imm;
 
-    // Instruction Memory (giữ tên IMEM)
-    IMEM imem (
-        .addr(pc_curr[31:2]),
+    // Instruction Memory (giữ tên instance IMEM_inst)
+    IMEM IMEM_inst (
+        .addr(pc[31:2]),
         .inst(inst)
     );
 
-    // Control Unit with integrated ALU Control
-    ControlUnit ctrl (
+    // Control Unit
+    ControlUnit ControlUnit_inst (
         .opcode(inst[6:0]),
         .funct3(inst[14:12]),
         .funct7(inst[31:25]),
@@ -69,7 +69,7 @@ module RISCV_Single_Cycle (
     );
 
     // Register File
-    RegFile regs_unit (
+    RegFile RegFile_inst (
         .clk(clk),
         .rst_n(rst_n),
         .rs1(rs1),
@@ -79,58 +79,60 @@ module RISCV_Single_Cycle (
         .wr_en(reg_wr),
         .rs1_data(reg_data1),
         .rs2_data(reg_data2),
-        .regs(regs)
+        .registers(registers)
     );
 
     // Immediate Generator
-    ImmGen imm_gen (
+    ImmGen ImmGen_inst (
         .inst(inst),
-        .imm(imm)
+        .imm_ext(imm)
     );
 
     // ALU Operand Selection
-    assign alu_op1 = pc_src ? pc_curr : reg_data1;
+    assign alu_op1 = pc_src ? pc : reg_data1;
     assign alu_op2 = alu_src ? imm : reg_data2;
 
     // Arithmetic Logic Unit
-    ALU alu (
+    ALU ALU_inst (
         .a(alu_op1),
         .b(alu_op2),
-        .op(alu_ctrl),
-        .res(alu_result)
+        .ALUControl(alu_ctrl),
+        .alu_out(alu_result)
     );
 
     // Branch Comparator
-    BranchComp branch_comp (
-        .a(reg_data1),
-        .b(reg_data2),
+    BranchComp BranchComp_inst (
+        .op(inst[6:0]),
         .funct3(inst[14:12]),
-        .take(branch_take)
+        .rs1_data(reg_data1),
+        .rs2_data(reg_data2),
+        .branch_taken(branch_take)
     );
 
-    // Data Memory (giữ tên DMEM)
-    DMEM dmem (
+    // Data Memory (giữ tên instance DMEM_inst)
+    DMEM DMEM_inst (
         .clk(clk),
-        .wr_en(mem_wr),
-        .rd_en(mem_rd),
-        .addr(alu_result),
-        .wr_data(reg_data2),
+        .MemWrite(mem_wr),
+        .MemRead(mem_rd),
+        .address(alu_result),
+        .write_data(reg_data2),
         .funct3(inst[14:12]),
-        .rd_data(mem_data)
+        .read_data(mem_data)
     );
 
     // Writeback Data Selection
-    assign wb_data = (wb_sel == 2'b00) ? alu_result :
-                    (wb_sel == 2'b01) ? mem_data :
-                    (wb_sel == 2'b10) ? pc_plus4 : 0;
+    assign wb_data = (wb_sel == 2'b00) ? alu_result : 
+                    (wb_sel == 2'b01) ? mem_data : 
+                    (wb_sel == 2'b10) ? pc_plus4 : 
+                    32'b0;
 
     // Next PC Selection
-    assign pc_next = halt ? pc_curr :
-                    is_jalr ? {alu_result[31:1], 1'b0} : // Clear LSB for alignment
+    assign pc_next = halt ? pc : 
+                    is_jalr ? alu_result : 
                     (branch && branch_take) || is_jal ? pc_target : 
                     pc_plus4;
 
     // Output assignments
-    assign inst_out = halt ? 32'hxxxxxxxx : inst;
-    assign pc_out = pc_curr;
+    assign Instruction_out_top = halt ? 32'hxxxxxxxx : inst;
+    assign PC_out_top = pc;
 endmodule

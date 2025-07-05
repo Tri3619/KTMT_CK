@@ -4,22 +4,22 @@ module RegFile (
     input [31:0] wr_data,
     input wr_en,
     output [31:0] rs1_data, rs2_data,
-    output reg [31:0] regs [0:31]
+    output reg [31:0] registers [0:31]
 );
-    // Initialize registers
+    // Initialize registers to 0
     integer i;
     initial begin
         for (i = 0; i < 32; i = i + 1)
-            regs[i] = 32'b0;
+            registers[i] = 32'b0;
     end
     
     // Read operations (asynchronous)
-    assign rs1_data = (rs1 != 0) ? regs[rs1] : 0;
-    assign rs2_data = (rs2 != 0) ? regs[rs2] : 0;
+    assign rs1_data = (rs1 != 0) ? registers[rs1] : 32'b0;
+    assign rs2_data = (rs2 != 0) ? registers[rs2] : 32'b0;
     
     // Write operation (synchronous)
     always @(posedge clk) begin
         if (wr_en && rd != 0)
-            regs[rd] <= wr_data;
+            registers[rd] <= wr_data;
     end
 endmodule

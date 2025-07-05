@@ -1,50 +1,50 @@
 module DMEM (
-    input clk,
-    input wr_en,
-    input rd_en,
-    input [31:0] addr,
-    input [31:0] wr_data,
+    input clk, 
+    input MemWrite, 
+    input MemRead,
+    input [31:0] address,
+    input [31:0] write_data,
     input [2:0] funct3,
-    output reg [31:0] rd_data
+    output reg [31:0] read_data
 );
-    // 4KB byte-addressable memory
-    reg [7:0] mem [0:4095];
-    
+    // Word-addressable memory (4KB: 1024 words)
+    reg [31:0] memory [0:1023];
+    wire [9:0] word_address = address[11:2]; // Use 10 bits for word addressing
+
     // Read operation
     always @(*) begin
-        rd_data = 32'b0;
-        if (rd_en) begin
+        if (MemRead) begin
             case (funct3)
-                3'b000: // LB
-                    rd_data = {{24{mem[addr][7]}}, mem[addr]};
-                3'b001: // LH
-                    rd_data = {{16{mem[addr+1][7]}}, mem[addr+1], mem[addr]};
-                3'b010: // LW
-                    rd_data = {mem[addr+3], mem[addr+2], mem[addr+1], mem[addr]};
-                3'b100: // LBU
-                    rd_data = {24'b0, mem[addr]};
-                3'b101: // LHU
-                    rd_data = {16'b0, mem[addr+1], mem[addr]};
+                3'b000: // lb
+                    read_data = {{24{memory[word_address][7]}}, memory[word_address][7:0]};
+                3'b001: // lh
+                    read_data = {{16{memory[word_address][15]}}, memory[word_address][15:0]};
+                3'b010: // lw
+                    read_data = memory[word_address];
+                3'b100: // lbu
+                    read_data = {24'b0, memory[word_address][7:0]};
+                3'b101: // lhu
+                    read_data = {16'b0, memory[word_address][15:0]};
+                default: 
+                    read_data = 32'b0;
             endcase
         end
+        else begin
+            read_data = 32'b0;
+        end
     end
-    
+
     // Write operation
     always @(posedge clk) begin
-        if (wr_en) begin
+        if (MemWrite) begin
             case (funct3)
-                3'b000: // SB
-                    mem[addr] <= wr_data[7:0];
-                3'b001: begin // SH
-                    mem[addr]   <= wr_data[7:0];
-                    mem[addr+1] <= wr_data[15:8];
-                end
-                3'b010: begin // SW
-                    mem[addr]   <= wr_data[7:0];
-                    mem[addr+1] <= wr_data[15:8];
-                    mem[addr+2] <= wr_data[23:16];
-                    mem[addr+3] <= wr_data[31:24];
-                end
+                3'b000: // sb
+                    memory[word_address][7:0] <= write_data[7:0];
+                3'b001: // sh
+                    memory[word_address][15:0] <= write_data[15:0];
+                3'b010: // sw
+                    memory[word_address] <= write_data;
+                default: ; // Do nothing
             endcase
         end
     end
